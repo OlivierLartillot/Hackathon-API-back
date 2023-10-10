@@ -21,28 +21,54 @@ class BookRepository extends ServiceEntityRepository
         parent::__construct($registry, Book::class);
     }
 
-//    /**
-//     * @return Book[] Returns an array of Book objects
-//     */
-//    public function findByExampleField($value): array
-//    {
-//        return $this->createQueryBuilder('b')
-//            ->andWhere('b.exampleField = :val')
-//            ->setParameter('val', $value)
-//            ->orderBy('b.id', 'ASC')
-//            ->setMaxResults(10)
-//            ->getQuery()
-//            ->getResult()
-//        ;
-//    }
+    public function findAllWithPagination($page, $limit)
+    {
+        $query = $this->createQueryBuilder('b')
+            ->setFirstResult(($page - 1) * $limit)
+            ->setMaxResults(($limit));
 
-//    public function findOneBySomeField($value): ?Book
-//    {
-//        return $this->createQueryBuilder('b')
-//            ->andWhere('b.exampleField = :val')
-//            ->setParameter('val', $value)
-//            ->getQuery()
-//            ->getOneOrNullResult()
-//        ;
-//    }
+        $totalBooks = count($this->findAll());
+        $totalPages = ceil($totalBooks / $limit);
+        $paginatedBooks = $query->getQuery()->getResult();
+
+        $discoverableBooks = [];
+
+        foreach ($paginatedBooks as $book) {
+            $bookId = $book->getId();
+            $book->addLink('post', '/books/' . $bookId);
+            $book->addLink('put', '/books/' . $bookId);
+            $book->addLink('delete', '/books/' . $bookId);
+            $discoverableBooks[] = [
+                'book' => $book,
+                'links' => $book->getLink()
+            ];
+        }
+
+        return ['currentPage' => intval($page), 'totalPages' => intval($totalPages), 'books' => $discoverableBooks];
+    }
+
+    //    /**
+    //     * @return Book[] Returns an array of Book objects
+    //     */
+    //    public function findByExampleField($value): array
+    //    {
+    //        return $this->createQueryBuilder('b')
+    //            ->andWhere('b.exampleField = :val')
+    //            ->setParameter('val', $value)
+    //            ->orderBy('b.id', 'ASC')
+    //            ->setMaxResults(10)
+    //            ->getQuery()
+    //            ->getResult()
+    //        ;
+    //    }
+
+    //    public function findOneBySomeField($value): ?Book
+    //    {
+    //        return $this->createQueryBuilder('b')
+    //            ->andWhere('b.exampleField = :val')
+    //            ->setParameter('val', $value)
+    //            ->getQuery()
+    //            ->getOneOrNullResult()
+    //        ;
+    //    }
 }
