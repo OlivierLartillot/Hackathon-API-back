@@ -2,7 +2,7 @@
 
 namespace App\Controller;
 
-use App\Entity\Author;
+use App\Entity\Book;
 use App\Repository\BookRepository;
 use App\Repository\AuthorRepository;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -14,13 +14,16 @@ use Symfony\Component\Serializer\SerializerInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Component\Serializer\Normalizer\AbstractNormalizer;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
+use Symfony\Contracts\Cache\ItemInterface;
+use Symfony\Contracts\Cache\TagAwareCacheInterface;
 use Nelmio\ApiDocBundle\Annotation\Model;
 use Nelmio\ApiDocBundle\Annotation\Security;
 use OpenApi\Annotations as OA;
 
 #[Route('/api')]
-class AuthorController extends AbstractController
+class BookController extends AbstractController
 {
 
     /**
@@ -46,14 +49,38 @@ class AuthorController extends AbstractController
      */
 
     /**
-     * Recover author list PAGINATED.
+     * Recover book list.
      *
      * @OA\Response(
      *     response=200,
-     *     description="Recover the list of authors PAGINATED.",
+     *     description="Recover the list of books.",
      *     @OA\JsonContent(
      *        type="array",
-     *        @OA\Items(ref=@Model(type=Author::class, groups={"getAuthors"}))
+     *        @OA\Items(ref=@Model(type=Book::class, groups={"getBooks"}))
+     *     )
+     * )
+     * 
+     * @OA\Tag(name="Books")
+     * 
+     */
+    #[Route('/books', name: 'getBooks', methods: ['GET'])]
+    public function getBooks(BookRepository $bookRepository, SerializerInterface $serializer): JsonResponse
+    {
+        $bookList = $bookRepository->findAll();
+        $jsonBookList = $serializer->serialize($bookList, 'json', ['groups' => 'getBooks']);
+
+        return new JsonResponse($jsonBookList, Response::HTTP_OK, [], true);
+    }
+
+    /**
+     * Recover book list PAGINATED.
+     *
+     * @OA\Response(
+     *     response=200,
+     *     description="Recover the list of books PAGINATED.",
+     *     @OA\JsonContent(
+     *        type="array",
+     *        @OA\Items(ref=@Model(type=Book::class, groups={"getBooks"}))
      *     )
      * )
      * 
@@ -70,158 +97,154 @@ class AuthorController extends AbstractController
      *     description="Number of results",
      *     @OA\Schema(type="int")
      * )
-     * @OA\Tag(name="Authors")
+     * @OA\Tag(name="Books")
      * 
      */
-    #[Route('/authorspages', name: 'getAuthorsPaginated', methods: ['GET'])]
-    public function getAuthorsPaginated(AuthorRepository $authorRepository, SerializerInterface $serializer, Request $request): JsonResponse
+    #[Route('/bookspages', name: 'getBooksPaginated', methods: ['GET'])]
+    public function getBooksPaginated(Request $request, BookRepository $bookRepository, TagAwareCacheInterface $cache, SerializerInterface $serializer): JsonResponse
     {
 
         $page = $request->get('page', 1);
         $limit = $request->get('limit', 3);
 
-        // $authorList = $authorRepository->findAll();
-        $authorList = $authorRepository->findAllWithPagination($page, $limit);
-        $jsonAuthorList = $serializer->serialize($authorList, 'json', ['groups' => 'getAuthors']);
 
-        return new JsonResponse($jsonAuthorList, Response::HTTP_OK, [], true);
+        $bookList = $bookRepository->findAllWithPagination($page, $limit);
+        $jsonBookList = $serializer->serialize($bookList, 'json', ['groups' => 'getBooks']);
+
+        // ------------------------- CACHE SET UP -------------------------
+        // $idCache = 'getBooks-' . $page . "-" . $limit;
+
+        // $jsonBookList = $cache->get($idCache, function (ItemInterface $item) use ($bookRepository, $page, $limit, $serializer) {
+        //     // echo ('Cache has been set!');
+        //     $item->tag('booksCache');
+        //     $item->expiresAfter(60);
+        //     $bookList = $bookRepository->findAllWithPagination($page, $limit);
+        //     return $serializer->serialize($bookList, 'json', ['groups' => 'getBooks']);
+        // });
+
+        return new JsonResponse($jsonBookList, Response::HTTP_OK, [], true);
     }
 
     /**
-     * Recover individual author.
+     * Recover individual book.
      *
      * @OA\Response(
      *     response=200,
-     *     description="Recover individual author.",
+     *     description="Recover individual book.",
      *     @OA\JsonContent(
      *        type="array",
-     *        @OA\Items(ref=@Model(type=Author::class, groups={"getAuthors"}))
+     *        @OA\Items(ref=@Model(type=Book::class, groups={"getBooks"}))
      *     )
      * )
      * 
-     * @OA\Tag(name="Authors")
+     * @OA\Tag(name="Books")
      * 
      */
-    #[Route('/authors/{id}', name: 'getAuthor', methods: ['GET'])]
-    public function getAuthor(Author $author, SerializerInterface $serializer): JsonResponse
+    #[Route('/books/{id}', name: 'getBook', methods: ['GET'])]
+    public function getBook(Book $book, SerializerInterface $serializer): JsonResponse
     {
-        $jsonAuthor = $serializer->serialize($author, 'json', ['groups' => 'getAuthors']);
-        return new JsonResponse($jsonAuthor, Response::HTTP_OK, [], true);
+        $jsonBook = $serializer->serialize($book, 'json', ['groups' => 'getBooks']);
+        return new JsonResponse($jsonBook, Response::HTTP_OK, [], true);
     }
 
     /**
-     * Create individual author. ADMIN ONLY
+     * Delete individual book. ADMIN ONLY
      *
      * @OA\Response(
      *     response=200,
-     *     description="Create individual author.",
+     *     description="Delete individual book.",
      *     @OA\JsonContent(
      *        type="array",
-     *        @OA\Items(ref=@Model(type=Author::class, groups={"getAuthors"}))
+     *        @OA\Items(ref=@Model(type=Book::class, groups={"getBooks"}))
      *     )
      * )
      * 
-     * @OA\Tag(name="Authors")
+     * @OA\Tag(name="Books")
      * 
      */
-    #[Route('/authors', name: 'createAuthor', methods: ['POST'])]
+    #[Route('/books/{id}', name: 'deleteBook', methods: ['DELETE'])]
     #[IsGranted('ROLE_ADMIN', message: 'You don\'t have access.')]
-    public function createAuthor(Request $request, SerializerInterface $serializer, EntityManagerInterface $em, UrlGeneratorInterface $urlGenerator, BookRepository $bookRepository): JsonResponse
+    public function deleteBook(Book $book, EntityManagerInterface $em, TagAwareCacheInterface $cache): JsonResponse
+    {
+        // $cache->invalidateTags(['booksCache']);
+        $em->remove($book);
+        $em->flush();
+
+        return new JsonResponse("Resource deleted.", Response::HTTP_NO_CONTENT);
+    }
+
+    /**
+     * Create individual book. ADMIN ONLY
+     *
+     * @OA\Response(
+     *     response=200,
+     *     description="Create individual book.",
+     *     @OA\JsonContent(
+     *        type="array",
+     *        @OA\Items(ref=@Model(type=Book::class, groups={"getBooks"}))
+     *     )
+     * )
+     * 
+     * @OA\Tag(name="Books")
+     * 
+     */
+    #[Route('/books', name: 'createBook', methods: ['POST'])]
+    #[IsGranted('ROLE_ADMIN', message: 'You don\'t have access.')]
+    public function createBook(Request $request, SerializerInterface $serializer, EntityManagerInterface $em, UrlGeneratorInterface $urlGenerator, AuthorRepository $authorRepository, ValidatorInterface $validator): JsonResponse
     {
 
-        // Deserialize the JSON body into an object
-        $author = $serializer->deserialize($request->getContent(), Author::class, 'json');
+        $book = $serializer->deserialize($request->getContent(), Book::class, 'json');
 
-        // Turn the request into an array, and extract the ids
-        $content = $request->toArray();
-        $idBooks = $content['idBooks'] ?? [];
+        // Error verification
+        $errors = $validator->validate($book);
 
-        // Loop on each id and add it to the author's books if it exists
-        foreach ($idBooks as $id) {
-            $book = $bookRepository->find($id);
-            if ($book) {
-                $author->addBook($book);
-            }
+        if ($errors->count() > 0) {
+            return new JsonResponse($serializer->serialize($errors, 'json'), Response::HTTP_BAD_REQUEST, [], true);
         }
 
-        // Persist and flush to the DB
-        $em->persist($author);
-        $em->flush();
-
-        // Return a JSON response to the console 
-        $jsonAuthor = $serializer->serialize($author, 'json', ['groups' => 'getAuthors']);
-        $location = $urlGenerator->generate('detailAuthor', ['id' => $author->getId()], UrlGeneratorInterface::ABSOLUTE_URL);
-
-        return new JsonResponse($jsonAuthor, Response::HTTP_CREATED, ["location" => $location], true);
-    }
-
-    /**
-     * Update individual author.
-     *
-     * @OA\Response(
-     *     response=200,
-     *     description="Update individual author.",
-     *     @OA\JsonContent(
-     *        type="array",
-     *        @OA\Items(ref=@Model(type=Author::class, groups={"getAuthors"}))
-     *     )
-     * )
-     * 
-     * @OA\Tag(name="Authors")
-     * 
-     */
-
-    #[Route('/authors/{id}', name: 'updateAuthor', methods: ['PUT'])]
-    public function updateAuthor(BookRepository $bookRepository, Author $currentAuthor, Request $request, SerializerInterface $serializer, EntityManagerInterface $em, AuthorRepository $authorRepository): JsonResponse
-    {
-        $updatedAuthor = $serializer->deserialize($request->getContent(), Author::class, 'json', [AbstractNormalizer::OBJECT_TO_POPULATE => $currentAuthor]);
-
-        // Turn the request into an array, and extract the ids
         $content = $request->toArray();
-        $idBooks = $content['idBooks'] ?? [];
+        $idAuthor = $content['idAuthor'] ?? -1;
 
-        // Clear book list
-        $updatedAuthor->getBooks()->clear();
+        $book->setAuthor($authorRepository->find($idAuthor));
 
-        // Loop on each id and add it to the author's books if it exists
-        foreach ($idBooks as $id) {
-            $book = $bookRepository->find($id);
-            if ($book) {
-                $currentAuthor->addBook($book);
-            }
-        }
-
-        $em->persist($updatedAuthor);
+        $em->persist($book);
         $em->flush();
 
-        $jsonUpdatedAuthor = $serializer->serialize($updatedAuthor, 'json', ['groups' => 'getAuthors']);
-        return new JsonResponse($jsonUpdatedAuthor, Response::HTTP_OK, [], true);
+        $jsonBook = $serializer->serialize($book, 'json', ['groups' => 'getBooks']);
+        $location = $urlGenerator->generate('getBook', ['id' => $book->getId()], UrlGeneratorInterface::ABSOLUTE_URL);
+
+        return new JsonResponse($jsonBook, Response::HTTP_CREATED, ["location" => $location], true);
     }
 
     /**
-     * Delete individual author. ADMIN ONLY
+     * Update individual book.
      *
      * @OA\Response(
      *     response=200,
-     *     description="Delete individual author.",
+     *     description="Update individual book.",
      *     @OA\JsonContent(
      *        type="array",
-     *        @OA\Items(ref=@Model(type=Author::class, groups={"getAuthors"}))
+     *        @OA\Items(ref=@Model(type=Book::class, groups={"getBooks"}))
      *     )
      * )
      * 
-     * @OA\Tag(name="Authors")
+     * @OA\Tag(name="Books")
      * 
      */
-    #[Route('/authors/{id}', name: 'deleteAuthor', methods: ['DELETE'])]
-    #[IsGranted('ROLE_ADMIN', message: 'You don\'t have access.')]
-    public function deleteAuthor(Author $author, EntityManagerInterface $em): JsonResponse
+    #[Route('/books/{id}', name: 'updateBook', methods: ['PUT'])]
+    public function updateBook(Book $currentBook, Request $request, SerializerInterface $serializer, EntityManagerInterface $em, AuthorRepository $authorRepository): JsonResponse
     {
+        $updatedBook = $serializer->deserialize($request->getContent(), Book::class, 'json', [AbstractNormalizer::OBJECT_TO_POPULATE => $currentBook]);
 
-        $em->remove($author);
+        $content = $request->toArray();
+        $idAuthor = $content['idAuthor'] ?? -1;
+
+        $updatedBook->setAuthor($authorRepository->find($idAuthor));
+
+        $em->persist($updatedBook);
         $em->flush();
-        // dd($author->getBooks());
 
-        return new JsonResponse(null, Response::HTTP_NO_CONTENT);
+        $jsonUpdatedBook = $serializer->serialize($updatedBook, 'json', ['groups' => 'getBooks']);
+        return new JsonResponse($jsonUpdatedBook, Response::HTTP_OK, [], true);
     }
 }
