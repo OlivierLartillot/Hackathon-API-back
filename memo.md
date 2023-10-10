@@ -2,6 +2,8 @@ clé passwd = hackathon
 "username": "admin@api.com",
 "password": "password"
 
+En ligne ne pas oublier de copier les clés publique et privée !!!
+
 ```shell
     # juste pour hasher un password rapidement 
     php bin/console security:hash-password
