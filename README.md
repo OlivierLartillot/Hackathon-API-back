@@ -9,7 +9,7 @@ Pour ce faire nous avions 1 jour et demi et ...une tres longue nuit devant nous 
 
 ## Ce repo
 
-Ce repo contient la partie que j'ai personnelement développée. 
+Ce repo contient la partie que j'ai personnellement développée. 
   - partie back développée en API
   - données présentées sous forme de documentation par l'intermédiaire de Nelmio doc. 
 
